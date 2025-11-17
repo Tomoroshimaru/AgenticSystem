@@ -1,0 +1,36 @@
+# ============================================================================
+# INVESTMENT AGENT - Dependencies
+# ============================================================================
+
+# Core LangChain & LangGraph
+langgraph>=0.2.35
+langchain>=0.3.0
+langchain-openai>=0.2.0
+langchain-core>=0.3.0
+
+# Data validation
+pydantic>=2.0.0
+
+# Notion API
+notion-client>=2.2.0
+
+# Google Drive API
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+google-auth-oauthlib>=1.0.0
+google-auth-httplib2>=0.1.0
+
+# Web search (Serper)
+requests>=2.31.0
+
+# PDF Generation (choose one or keep multiple options)
+reportlab>=4.0.0
+# weasyprint>=60.0  # Alternative
+# fpdf2>=2.7.0      # Alternative
+
+# Utilities
+python-dotenv>=1.0.0
+loguru>=0.7.0
+
+# Optional: for better async support
+aiohttp>=3.9.0
