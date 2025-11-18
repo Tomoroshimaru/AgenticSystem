@@ -13,8 +13,26 @@ from loguru import logger
 from config import LLMConfig, APIConfig
 from state import InvestmentState
 from prompts import SQL_GENERATION_SYSTEM, SQL_GENERATION_PROMPT
-from tools import NotionClient
+from tools import NotionAPIClient
 
+def extract_json(text: str) -> str:
+    """Extrait le JSON d'une réponse LLM"""
+    text = text.strip()
+    
+    # Supprimer les backticks markdown
+    if text.startswith("```"):
+        lines = text.split('\n')
+        text = '\n'.join(lines[1:-1]) if len(lines) > 2 else text
+        text = text.replace("```json", "").replace("```", "").strip()
+    
+    # Trouver le JSON
+    start = text.find("{")
+    end = text.rfind("}") + 1
+    
+    if start == -1 or end == 0:
+        raise ValueError(f"Pas de JSON: {text[:200]}")
+    
+    return text[start:end]
 
 def query_generator_node(state: InvestmentState) -> Dict[str, Any]:
     """
@@ -75,7 +93,8 @@ def query_generator_node(state: InvestmentState) -> Dict[str, Any]:
         
         # Parse JSON
         try:
-            query_dict = json.loads(response_text)
+            clean_text = extract_json(response_text)
+            query_dict = json.loads(clean_text)
         except json.JSONDecodeError as e:
             logger.error(f"Failed to parse JSON query: {e}")
             
@@ -87,7 +106,7 @@ def query_generator_node(state: InvestmentState) -> Dict[str, Any]:
             }
         
         # Validate query structure
-        notion_client = NotionClient()
+        notion_client = NotionAPIClient()
         is_valid, errors = notion_client.validate_query(query_dict)
         
         if is_valid:

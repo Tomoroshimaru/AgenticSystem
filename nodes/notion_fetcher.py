@@ -10,7 +10,7 @@ from loguru import logger
 
 from config import WorkflowConfig
 from state import InvestmentState
-from tools import NotionClient
+from tools import NotionAPIClient
 
 
 def notion_fetcher_node(state: InvestmentState) -> Dict[str, Any]:
@@ -44,7 +44,7 @@ def notion_fetcher_node(state: InvestmentState) -> Dict[str, Any]:
         query_dict = json.loads(generated_query)
         
         # Initialize Notion client
-        notion_client = NotionClient()
+        notion_client = NotionAPIClient()
         
         # Execute query
         deals = notion_client.query_database(

@@ -5,6 +5,7 @@ Wrapper for Notion API to query the fundraising database.
 """
 
 import json
+import requests
 from typing import List, Dict, Any, Optional
 from notion_client import Client
 from loguru import logger
@@ -13,63 +14,69 @@ from config import APIConfig
 from state import NotionDeal
 
 
-class NotionClient:
+class NotionAPIClient:
     """Client pour interagir avec l'API Notion"""
     
     def __init__(self, api_key: Optional[str] = None, database_id: Optional[str] = None):
         """
         Initialize Notion client
-        
-        Args:
-            api_key: Notion API key (defaults to config)
-            database_id: Notion database ID (defaults to config)
         """
-        self.api_key = api_key or APIConfig.NOTION_API_KEY
-        self.database_id = database_id or APIConfig.NOTION_DATABASE_ID
+        api_key = api_key or APIConfig.NOTION_API_KEY
+        database_id = database_id or APIConfig.NOTION_DATABASE_ID
         
-        if not self.api_key or not self.database_id:
+        if not api_key or not database_id:
             raise ValueError("Notion API key and database ID are required")
         
-        self.client = Client(auth=self.api_key)
+        # Stocker les valeurs AVANT de créer le client
+        self.api_key = api_key
+        self.database_id = database_id
+        self.client = Client(auth=api_key)
+        
         logger.info("Notion client initialized")
-    
+
     def query_database(
         self,
         filter_query: Dict[str, Any],
         max_results: int = 10
     ) -> List[NotionDeal]:
-        """
-        Query the Notion database with filters
-        
-        Args:
-            filter_query: Notion API filter object
-            max_results: Maximum number of results to return
-            
-        Returns:
-            List of NotionDeal objects
-        """
+        """Query the Notion database with filters"""
         try:
-            logger.info(f"Querying Notion database with filter: {json.dumps(filter_query, indent=2)}")
+            logger.info(f"Querying Notion database")
             
-            # Ensure page_size is set
-            filter_query["page_size"] = min(max_results, 10)
+            url = f"https://api.notion.com/v1/databases/{self.database_id}/query"
             
-            # Query the database
-            response = self.client.databases.query(
-                database_id=self.database_id,
-                **filter_query
-            )
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+                "Notion-Version": "2022-06-28"
+            }
             
-            # Parse results
-            deals = self._parse_results(response.get("results", []))
+            payload = {
+                "page_size": min(max_results, 100)
+            }
             
-            logger.info(f"Found {len(deals)} deals in Notion")
+            if "filter" in filter_query:
+                payload["filter"] = filter_query["filter"]
+            if "sorts" in filter_query:
+                payload["sorts"] = filter_query["sorts"]
+            
+            logger.info(f"Payload sent to Notion: {json.dumps(payload, indent=2)}")
+
+            response = requests.post(url, json=payload, headers=headers)
+            if not response.ok:
+                logger.error(f"Notion API error response: {response.text}")
+            response.raise_for_status()
+            
+            data = response.json()
+            deals = self._parse_results(data.get("results", []))
+            
+            logger.info(f"Found {len(deals)} deals")
             return deals[:max_results]
             
         except Exception as e:
             logger.error(f"Error querying Notion database: {e}")
             raise
-    
+            
     def _parse_results(self, results: List[Dict]) -> List[NotionDeal]:
         """
         Parse Notion API results into NotionDeal objects
@@ -195,7 +202,7 @@ class NotionClient:
 def test_notion_connection() -> bool:
     """Test Notion connection and database access"""
     try:
-        client = NotionClient()
+        client = NotionAPIClient()
         
         # Simple query to test connection
         test_query = {
