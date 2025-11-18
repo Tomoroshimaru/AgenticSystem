@@ -18,16 +18,13 @@ class NotionAPIClient:
     """Client pour interagir avec l'API Notion"""
     
     def __init__(self, api_key: Optional[str] = None, database_id: Optional[str] = None):
-        """
-        Initialize Notion client
-        """
+        """Initialize Notion client"""
         api_key = api_key or APIConfig.NOTION_API_KEY
         database_id = database_id or APIConfig.NOTION_DATABASE_ID
         
         if not api_key or not database_id:
             raise ValueError("Notion API key and database ID are required")
         
-        # Stocker les valeurs AVANT de créer le client
         self.api_key = api_key
         self.database_id = database_id
         self.client = Client(auth=api_key)
@@ -78,53 +75,58 @@ class NotionAPIClient:
             raise
             
     def _parse_results(self, results: List[Dict]) -> List[NotionDeal]:
-        """
-        Parse Notion API results into NotionDeal objects
-        
-        Args:
-            results: Raw Notion API results
-            
-        Returns:
-            List of NotionDeal objects
-        """
+        """Parse Notion API results into NotionDeal objects"""
         deals = []
         
         for result in results:
             try:
                 properties = result.get("properties", {})
                 
+                # Extract title property (Company) - with case variations
+                company_prop = (properties.get("Company", {}) or 
+                               properties.get("company", {}) or 
+                               properties.get("Name", {}))
+                company_name = self._extract_title(company_prop)
+                
+                # If still None, try as rich_text fallback
+                if not company_name:
+                    company_name = self._extract_rich_text(company_prop) or "Unknown"
+                
                 deal = NotionDeal(
                     id=result.get("id", ""),
-                    company=self._extract_rich_text(properties.get("company", {})),
-                    website=self._extract_rich_text(properties.get("website", {})),
-                    country=self._extract_rich_text(properties.get("country", {})),
-                    sector=self._extract_rich_text(properties.get("Sector", {})),
-                    tag_1=self._extract_rich_text(properties.get("Tag 1", {})),
-                    tag_2=self._extract_rich_text(properties.get("Tag 2", {})),
-                    tag_3=self._extract_rich_text(properties.get("Tag 3", {})),
-                    amount_raised=self._extract_rich_text(properties.get("Amount raised", {})),
-                    round=self._extract_rich_text(properties.get("Round", {})),
-                    pitch=self._extract_rich_text(properties.get("Pitch", {})),
+                    company=company_name,
+                    website=self._extract_rich_text(properties.get("Website", {})) or "",
+                    country=self._extract_rich_text(properties.get("Country", {})) or "",
+                    sector=self._extract_rich_text(properties.get("Sector", {})) or "",
+                    tag_1=self._extract_rich_text(properties.get("Tag 1", {})) or "",
+                    tag_2=self._extract_rich_text(properties.get("Tag 2", {})) or "",
+                    tag_3=self._extract_rich_text(properties.get("Tag 3", {})) or "",
+                    amount_raised=self._extract_rich_text(properties.get("Amount Raised", {})) or "",
+                    round=self._extract_rich_text(properties.get("Round", {})) or "",
+                    pitch=self._extract_rich_text(properties.get("Pitch", {})) or "",
                 )
                 
                 deals.append(deal)
                 
             except Exception as e:
                 logger.warning(f"Failed to parse Notion result: {e}")
+                logger.debug(f"Problematic result: {result}")
                 continue
         
         return deals
     
+    def _extract_title(self, property_obj: Dict) -> Optional[str]:
+        """Extract text from Notion title property"""
+        try:
+            title = property_obj.get("title", [])
+            if title and len(title) > 0:
+                return title[0].get("plain_text", "")
+            return None
+        except Exception:
+            return None
+    
     def _extract_rich_text(self, property_obj: Dict) -> Optional[str]:
-        """
-        Extract text from Notion rich_text property
-        
-        Args:
-            property_obj: Notion property object
-            
-        Returns:
-            Extracted text or None
-        """
+        """Extract text from Notion rich_text property"""
         try:
             rich_text = property_obj.get("rich_text", [])
             if rich_text and len(rich_text) > 0:
@@ -134,15 +136,7 @@ class NotionAPIClient:
             return None
     
     def validate_query(self, query: Dict[str, Any]) -> tuple[bool, List[str]]:
-        """
-        Validate a Notion query structure
-        
-        Args:
-            query: Query dict to validate
-            
-        Returns:
-            Tuple of (is_valid, list_of_errors)
-        """
+        """Validate a Notion query structure"""
         errors = []
         
         # Check required fields
@@ -159,11 +153,27 @@ class NotionAPIClient:
                     errors.append("'and' must be a list of conditions")
                 
                 for i, condition in enumerate(conditions):
-                    if "property" not in condition:
-                        errors.append(f"Condition {i} missing 'property' field")
-                    if "rich_text" not in condition:
-                        errors.append(f"Condition {i} missing 'rich_text' field")
-            
+                        
+                    # CASE 1 : Simple condition (rich_text)
+                    if "property" in condition:
+                        if "rich_text" not in condition:
+                            errors.append(f"Condition {i} missing 'rich_text' field")
+                        continue
+
+                    # CASE 2 : Logical group (OR / AND)
+                    if "or" in condition:
+                        if not isinstance(condition["or"], list):
+                            errors.append(f"Condition {i} 'or' must be a list")
+                        continue
+                    
+                    if "and" in condition:
+                        if not isinstance(condition["and"], list):
+                            errors.append(f"Condition {i} 'and' must be a list")
+                        continue
+
+                    # CASE 3 : Unknown structure
+                    errors.append(f"Condition {i} is not a valid Notion filter block")
+
             elif "or" in filter_obj:
                 conditions = filter_obj["or"]
                 if not isinstance(conditions, list):
