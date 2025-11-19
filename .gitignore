@@ -60,6 +60,7 @@ checkpoints.db
 # Google Credentials
 oauth_credentials.json
 token.json
+token.pickle
 *.json
 !package*.json
 
@@ -92,4 +93,4 @@ Desktop.ini
 *.bak
 *.backup
 *.tmp
-token.pickle
+
