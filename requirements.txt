@@ -34,3 +34,9 @@ loguru>=0.7.0
 
 # Optional: for better async support
 aiohttp>=3.9.0
+
+# Streamlit
+streamlit
+
+# Logs
+loguru
