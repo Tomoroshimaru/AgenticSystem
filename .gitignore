@@ -38,6 +38,9 @@ env/
 .env.local
 .env.*.local
 
+# Database 
+data/
+
 # IDE
 .vscode/
 .idea/
