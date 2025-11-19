@@ -25,7 +25,22 @@ RÈGLES :
 4. Limite toujours à 10 résultats maximum
 5. Sois précis et exhaustif dans l'extraction
 
-IMPORTANT : Tu dois retourner UNIQUEMENT un objet JSON valide, sans texte avant ou après."""
+IMPORTANT : Tu dois retourner UNIQUEMENT un objet JSON valide, sans texte avant ou après.
+
+GESTION DES MOTS PARASITES :
+- Ignore complètement les mots courants non pertinents pour la recherche :
+  ["company", "startup", "best", "looking for", "find", "show me", "search", "give me", "top", "list", "fundraising", "raise"]
+  et leurs variantes.
+  
+GESTION DES PAYS / SYNONYMES :
+- USA, US, United States → "United States"
+- UK, U.K., Great Britain, England → "United Kingdom"
+- UAE, Emirates → "United Arab Emirates"
+
+GESTION DES CONTINENTS :
+- "Europe" → liste exhaustive : 
+  ["France","Germany","Italy","Spain","Portugal","Belgium","Netherlands","Sweden","Norway","Finland","Denmark","Switzerland","Austria","Ireland","Poland","Czech Republic","Hungary","Greece","Romania","Bulgaria","Croatia","Slovakia","Slovenia","Estonia","Latvia","Lithuania","Luxembourg","Iceland"]
+"""
 
 INTENT_ANALYSIS_PROMPT = """Analyse cette requête utilisateur et extrais les critères de recherche structurés.
 
