@@ -58,7 +58,7 @@ temp/
 checkpoints.db
 
 # Google Credentials
-credentials.json
+oauth_credentials.json
 token.json
 *.json
 !package*.json
