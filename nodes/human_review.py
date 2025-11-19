@@ -14,35 +14,26 @@ from state import InvestmentState
 def human_review_node(state: InvestmentState) -> Dict[str, Any]:
     """
     Node 4: Human-in-the-loop for deal selection
-    
-    This node interrupts the workflow and waits for user input.
-    The user must select which deals to enrich.
-    
-    Args:
-        state: Current workflow state
-        
-    Returns:
-        State updates
     """
     logger.info("=" * 50)
     logger.info("NODE 4: Human Review (HITL)")
     logger.info("=" * 50)
     
     try:
-        notion_results = state.notion_results
+        deals = state.deals
         
-        if not notion_results:
+        if not deals:
             logger.warning("No deals to review")
             return {
                 "current_step": "no_deals_to_review",
                 "selected_deal_ids": []
             }
         
-        logger.info(f"Presenting {len(notion_results)} deals for review")
+        logger.info(f"Presenting {len(deals)} deals for review")
         
-        # Format deals for presentation
+        # Format presentation
         deals_presentation = []
-        for i, deal in enumerate(notion_results, 1):
+        for i, deal in enumerate(deals, 1):
             deal_info = (
                 f"[{i}] {deal.company}\n"
                 f"    Sector: {deal.sector or 'N/A'} | "
@@ -54,27 +45,19 @@ def human_review_node(state: InvestmentState) -> Dict[str, Any]:
         
         presentation_text = "\n\n".join(deals_presentation)
         
-        logger.info("Deals for review:")
-        logger.info(f"\n{presentation_text}")
-        
-        # Prepare instruction message
         instruction = (
-            f"📊 J'ai trouvé {len(notion_results)} levée(s) de fonds :\n\n"
+            f"📊 J'ai trouvé {len(deals)} levée(s) de fonds :\n\n"
             f"{presentation_text}\n\n"
-            "Veuillez sélectionner les deals à enrichir en fournissant leurs numéros "
-            "(ex: 1,3,5 ou all pour tous).\n"
-            "Vous pouvez aussi ajouter des commentaires optionnels."
+            "Veuillez sélectionner les deals à enrichir (ex: 1,3,5 ou 'all')."
         )
         
-        # Interrupt and wait for user input
-        # The user will need to resume with Command(resume={...})
+        # Interrupt for user input
         user_input = interrupt(instruction)
         
-        # When resumed, parse the user input
         logger.info(f"User input received: {user_input}")
         
         # Parse selection
-        selected_ids = []
+        selected_indices = []
         user_feedback = None
         
         if isinstance(user_input, dict):
@@ -83,35 +66,33 @@ def human_review_node(state: InvestmentState) -> Dict[str, Any]:
         elif isinstance(user_input, str):
             selection = user_input
         else:
-            logger.error(f"Unexpected user input type: {type(user_input)}")
+            logger.error(f"Unexpected input type: {type(user_input)}")
             selection = ""
         
-        # Parse selection string
+        # Parse selection
         if selection.lower().strip() == "all":
-            selected_ids = [deal.id for deal in notion_results]
+            selected_indices = list(range(len(deals)))
             logger.info("User selected ALL deals")
         else:
-            # Parse comma-separated numbers
             try:
-                indices = [int(x.strip()) for x in selection.split(",") if x.strip()]
-                selected_ids = [
-                    notion_results[i - 1].id
-                    for i in indices
-                    if 1 <= i <= len(notion_results)
+                user_nums = [int(x.strip()) for x in selection.split(",") if x.strip()]
+                selected_indices = [
+                    i - 1
+                    for i in user_nums
+                    if 1 <= i <= len(deals)
                 ]
-                logger.info(f"User selected {len(selected_ids)} deal(s): indices {indices}")
+                logger.info(f"User selected {len(selected_indices)} deal(s)")
             except (ValueError, IndexError) as e:
                 logger.error(f"Failed to parse selection: {e}")
-                selected_ids = []
+                selected_indices = []
         
-        if not selected_ids:
-            logger.warning("No valid deals selected")
+        if not selected_indices:
             message = "Aucun deal sélectionné. Workflow terminé."
         else:
-            message = f"Parfait ! J'ai sélectionné {len(selected_ids)} deal(s) pour enrichissement."
+            message = f"Parfait ! {len(selected_indices)} deal(s) sélectionné(s)."
         
         return {
-            "selected_deal_ids": selected_ids,
+            "selected_deal_ids": selected_indices,
             "user_feedback": user_feedback,
             "current_step": "deals_selected",
             "messages": state.messages + [

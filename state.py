@@ -13,35 +13,41 @@ from datetime import datetime
 # PYDANTIC MODELS - Data Structures
 # ============================================================================
 
-class NotionDeal(BaseModel):
-    """Structure d'une levée de fonds extraite de Notion"""
+class Deal(BaseModel):
+    """Structure d'une levée de fonds (source: CSV via DuckDB)"""
     
-    id: str = Field(..., description="ID unique Notion")
     company: str = Field(..., description="Nom de l'entreprise")
     website: Optional[str] = Field(None, description="URL du site web")
+    linkedin_url: Optional[str] = Field(None, description="URL LinkedIn")
     country: Optional[str] = Field(None, description="Pays")
-    sector: Optional[str] = Field(None, description="Secteur d'activité")
-    tag_1: Optional[str] = Field(None, description="Tag principal")
-    tag_2: Optional[str] = Field(None, description="Tag secondaire")
-    tag_3: Optional[str] = Field(None, description="Tag tertiaire")
+    founding_year: Optional[str] = Field(None, description="Année de création")
+    sector: Optional[str] = Field(None, description="Secteur d'activité principal")
+    sector_2: Optional[str] = Field(None, description="Secteur secondaire")
+    tags: List[str] = Field(default_factory=list, description="Tags/mots-clés")
     amount_raised: Optional[str] = Field(None, description="Montant levé (format texte)")
     round: Optional[str] = Field(None, description="Type de round (Seed, Serie A, etc.)")
     pitch: Optional[str] = Field(None, description="Description de l'entreprise")
+    investors: Optional[str] = Field(None, description="Investisseurs")
+    spotted_date: Optional[str] = Field(None, description="Date de repérage")
+    source_urls: List[str] = Field(default_factory=list, description="URLs sources")
     
     class Config:
         json_schema_extra = {
             "example": {
-                "id": "notion_abc123",
                 "company": "Acme Corp",
                 "website": "https://acme.com",
+                "linkedin_url": "https://linkedin.com/company/acme",
                 "country": "France",
+                "founding_year": "2020",
                 "sector": "SaaS B2B",
-                "tag_1": "Enterprise",
-                "tag_2": "Cloud",
-                "tag_3": "Security",
-                "amount_raised": "5M€",
-                "round": "Serie A",
-                "pitch": "Cloud security platform for enterprises"
+                "sector_2": "Cloud",
+                "tags": ["Enterprise", "AI", "Security"],
+                "amount_raised": "5.00 M$",
+                "round": "Series A",
+                "pitch": "Cloud security platform for enterprises",
+                "investors": "Sequoia, Accel",
+                "spotted_date": "2025-01-15",
+                "source_urls": ["https://techcrunch.com/..."]
             }
         }
 
@@ -59,9 +65,9 @@ class AnalyzedIntent(BaseModel):
     )
     max_results: int = Field(
         default=10,
-        le=10,
+        le=20,
         ge=1,
-        description="Nombre maximum de résultats (max 10)"
+        description="Nombre maximum de résultats"
     )
     raw_query: str = Field(default="", description="Requête originale")
     
@@ -126,7 +132,7 @@ class SimilarCompany(BaseModel):
 class EnrichedDeal(BaseModel):
     """Une levée enrichie avec des cibles similaires"""
     
-    original_deal: NotionDeal = Field(..., description="Deal original de Notion")
+    original_deal: Deal = Field(..., description="Deal original")
     similar_companies: List[SimilarCompany] = Field(
         default_factory=list,
         description="Liste des entreprises similaires trouvées"
@@ -184,7 +190,7 @@ class InvestmentState(BaseModel):
     # === ÉTAPE 2: QUERY GENERATION ===
     generated_query: str = Field(
         default="",
-        description="Requête Notion générée (JSON filter)"
+        description="Requête SQL générée"
     )
     query_valid: bool = Field(
         default=False,
@@ -195,20 +201,20 @@ class InvestmentState(BaseModel):
         description="Erreurs de validation de la requête"
     )
     
-    # === ÉTAPE 3: NOTION FETCH ===
-    notion_results: List[NotionDeal] = Field(
+    # === ÉTAPE 3: DATA FETCH ===
+    deals: List[Deal] = Field(
         default_factory=list,
-        description="Résultats bruts de Notion"
+        description="Résultats bruts (deals from CSV)"
     )
     results_count: int = Field(
         default=0,
-        description="Nombre de résultats Notion"
+        description="Nombre de résultats"
     )
     
     # === ÉTAPE 4: HUMAN REVIEW (HITL) ===
-    selected_deal_ids: List[str] = Field(
+    selected_deal_ids: List[int] = Field(
         default_factory=list,
-        description="IDs des deals sélectionnés par l'utilisateur"
+        description="Indices des deals sélectionnés par l'utilisateur (0-based)"
     )
     user_feedback: Optional[str] = Field(
         None,
@@ -222,7 +228,7 @@ class InvestmentState(BaseModel):
     )
     enrichment_criteria: Dict[str, Any] = Field(
         default_factory=lambda: {
-            "match_fields": ["sector", "tag_1", "tag_2", "tag_3", "round"],
+            "match_fields": ["sector", "tags", "round"],
             "min_similarity": 0.6,
             "max_similar_per_deal": 5
         },
@@ -309,11 +315,12 @@ def add_error(
     return state
 
 
-def get_selected_deals(state: InvestmentState) -> List[NotionDeal]:
+def get_selected_deals(state: InvestmentState) -> List[Deal]:
     """Récupère les deals sélectionnés par l'utilisateur"""
     return [
-        deal for deal in state.notion_results
-        if deal.id in state.selected_deal_ids
+        state.deals[i]
+        for i in state.selected_deal_ids
+        if i < len(state.deals)
     ]
 
 

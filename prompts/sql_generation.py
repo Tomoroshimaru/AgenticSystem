@@ -1,129 +1,122 @@
 """
-SQL/Query Generation Prompts
-=============================
-Prompts for generating Notion API queries from analyzed intent.
+SQL Generation Prompts
+======================
+Prompts for generating DuckDB SQL queries from analyzed intent.
 """
 
 SQL_GENERATION_SYSTEM = """
-Tu es un expert en API Notion et en génération de requêtes.
+Tu es un expert en SQL et en analyse de données.
 
-Ta mission est de convertir des critères de recherche en requêtes valides pour l'API Notion.
+Ta mission est de convertir des critères de recherche en requêtes SQL valides pour DuckDB.
 
-SCHÉMA DE LA BASE :
-- Company (title)
-- Website (rich_text)
-- Country (rich_text)
-- Sector (rich_text)
-- Tag 1, Tag 2, Tag 3 (rich_text)
-- Amount Raised (rich_text)
-- Round (rich_text)
-- Pitch (rich_text) ⚠️ NE JAMAIS FILTRER SUR CE CHAMP
-- Date de création (created_time)
+SCHÉMA DE LA TABLE 'deals' :
+- Company (VARCHAR)
+- Website (VARCHAR)
+- Linkedin_URL (VARCHAR)
+- Country (VARCHAR)
+- Founding_Year (VARCHAR)
+- "Sector 1" (VARCHAR) - Note: nom avec espace, utiliser des guillemets
+- "Sector 2" (VARCHAR)
+- "Tag 1", "Tag 2", "Tag 3", "Tag 4", "Tag 5" (VARCHAR)
+- Round (VARCHAR)
+- Amount_Raised (VARCHAR) - Format: "300.00 M$", "60.00 M$"
+- Pitch (VARCHAR) - Description longue
+- Investors (VARCHAR)
+- Spotted_Date (DATE)
+- Source_1, Source_2, Source_3 (VARCHAR)
 
-IMPORTANT :
-- Tous les champs sauf Company et Date de création sont rich_text.
-- Pour rich_text, autorisé UNIQUEMENT :
-    - contains
-    - does_not_contain
-    - starts_with
-    - ends_with
-- NE PAS UTILISER "equals" → invalide pour rich_text
-- NE PAS UTILISER DE SORT ("sorts" interdit)
-- ⚠️ NE JAMAIS FILTRER SUR LE CHAMP "Pitch"
+RÈGLES SQL :
+1. Toujours utiliser ILIKE pour les recherches insensibles à la casse
+2. Les noms de colonnes avec espaces doivent être entre guillemets doubles : "Sector 1"
+3. Pour chercher dans plusieurs colonnes tags : 
+   WHERE ("Tag 1" ILIKE '%AI%' OR "Tag 2" ILIKE '%AI%' OR ...)
+4. Pour l'amount: extraire le nombre avec REGEXP, ex:
+   CAST(REGEXP_EXTRACT(Amount_Raised, '([0-9.]+)', 1) AS FLOAT)
+5. Limiter les résultats avec LIMIT (défaut: 10)
 
-RÈGLE DE TRADUCTION AUTOMATIQUE :
-Tu DOIS traduire en anglais TOUTES les valeurs qui sont en français :
-- Sector : "médecine", "santé", "medtech", "métech", "health", etc. → "Medtech"
+TRADUCTION AUTOMATIQUE :
+Traduire TOUTES les valeurs françaises en anglais :
+- Secteur : "santé", "médecine" → "Medtech" ou "Biotech"
 - Tags : "IA", "intelligence artificielle" → "AI"
-- Country : "français", "France", "france" → "France"
-- Round : "série A", "serie A", "série B" → "Series A", "Series B"
+- Pays : "français", "France" → "France"
+- Round : "série A" → "Series A"
 - Finance → "Finance"
 - Technologie → "Tech"
 
-RÈGLES POUR LA PLURALITÉ :
-1. Si plusieurs secteurs sont fournis :
-   → créer un bloc "or" avec un rich_text.contains par secteur.
-
-2. Si plusieurs tags sont fournis :
-   → pour CHAQUE tag, créer un bloc "or" contenant :
-        - Tag 1 / rich_text.contains
-        - Tag 2 / rich_text.contains
-        - Tag 3 / rich_text.contains
-   → Pour plusieurs tags, générer un bloc "and" contenant un "or" par tag.
-
-3. Si plusieurs pays sont fournis :
-   → même logique : un bloc OR par pays.
-
 CONTRAINTES :
-- Tu dois répondre EXCLUSIVEMENT par un JSON strict.
-- La réponse DOIT commencer par '{' et se terminer par '}'.
-- Aucune explication, aucun markdown, aucune phrase additionnelle.
-- Pas de triple backticks.
+- Répondre UNIQUEMENT avec une requête SQL valide
+- Pas d'explication, pas de markdown, pas de triple backticks
+- SELECT * FROM deals WHERE ... LIMIT 10
 
-FORMAT ATTENDU :
-{
-  "filter": {
-    "and": [
-      ...
-    ]
-  },
-  "page_size": 10
-}
+FORMAT :
+SELECT * FROM deals WHERE <conditions> LIMIT <number>
 """
 
 SQL_GENERATION_PROMPT = """
-Génère une requête Notion API à partir des critères suivants :
+Génère une requête SQL DuckDB à partir des critères suivants :
 
 CRITÈRES :
 {analyzed_intent}
 
-RÈGLES DE CONVERSION STRICTES :
-1. Mapping obligatoire :
-   - "sector" → property "Sector" (rich_text.contains)
-   - "country" → property "Country" (rich_text.contains)
-   - "round" → property "Round" (rich_text.contains)
-   - "tags" → bloc "or" contenant Tag 1 / Tag 2 / Tag 3
-   - "amount" → "Amount Raised" (rich_text.contains)
+RÈGLES DE CONVERSION :
+1. Mapping des critères :
+   - "sector" → "Sector 1" ILIKE '%<value>%' (ou OR "Sector 2")
+   - "country" → Country ILIKE '%<value>%'
+   - "round" → Round ILIKE '%<value>%'
+   - "tags" → ("Tag 1" ILIKE '%<tag>%' OR "Tag 2" ILIKE '%<tag>%' OR ...)
+   - "amount" → extraire avec REGEXP et comparer
 
-2. Traduction automatique :
-   Tous les termes français doivent être traduits avant construction du JSON :
-     - IA → AI
-     - medtech / santé / médecine → Medtech
-     - finance / financier → Finance
-     - technologie / tech → Tech
-     - série A / série B → Series A / Series B
-     - français → France
+2. Traductions automatiques (français → anglais) :
+   - IA → AI
+   - santé/médecine/medtech → Medtech
+   - finance/financier → Finance
+   - tech/technologie → Tech
+   - série A/B → Series A/B
+   
+3. Plusieurs critères :
+   - Combiner avec AND
+   - Pour plusieurs valeurs d'un même critère, utiliser OR
+   
+4. Interdictions :
+   - Ne jamais filtrer uniquement sur Pitch (trop vague)
+   - Ignorer les termes génériques ("best", "top", "good", "interesting")
 
-3. Pluralité :
-   - Si plusieurs secteurs → créer {"or": [ ... ]}
-   - Si plusieurs pays → {"or": [ ... ]}
-   - Si plusieurs tags :
-       Pour chaque tag → créer un bloc :
-         {
-           "or": [
-             {"property": "Tag 1", "rich_text": {"contains": <tag>}},
-             {"property": "Tag 2", "rich_text": {"contains": <tag>}},
-             {"property": "Tag 3", "rich_text": {"contains": <tag>}}
-           ]
-         }
-       Puis mettre tous ces blocs dans un "and".
+EXEMPLES :
 
-4. Interdictions absolues :
-   - Ne JAMAIS filtrer sur "Pitch".
-   - Ne JAMAIS utiliser "equals" pour rich_text.
-   - Ne JAMAIS utiliser "sorts".
-   - Ne JAMAIS inclure de mots génériques ("best", "top", "good", "interesting", etc.).
-   - Ces mots doivent être complètement ignorés.
+User: "Find AI startups in France"
+SQL: SELECT * FROM deals WHERE ("Tag 1" ILIKE '%AI%' OR "Tag 2" ILIKE '%AI%' OR "Tag 3" ILIKE '%AI%') AND Country ILIKE '%France%' LIMIT 10
 
-FORMAT ATTENDU :
+User: "Medtech companies Series A"
+SQL: SELECT * FROM deals WHERE "Sector 1" ILIKE '%Medtech%' AND Round ILIKE '%Series A%' LIMIT 10
+
+User: "Fintech startups that raised over 50M"
+SQL: SELECT * FROM deals WHERE "Sector 1" ILIKE '%Fintech%' AND CAST(REGEXP_EXTRACT(Amount_Raised, '([0-9.]+)', 1) AS FLOAT) > 50 LIMIT 10
+
+RETOURNE UNIQUEMENT LA REQUÊTE SQL, sans explication.
+"""
+
+
+SQL_VALIDATION_PROMPT = """
+Vérifie que cette requête SQL est valide pour DuckDB :
+
+REQUÊTE :
+{sql_query}
+
+SCHÉMA :
+{schema}
+
+VÉRIFIE :
+1. Syntaxe SQL correcte
+2. Noms de colonnes existent (avec guillemets si espaces)
+3. Opérateurs appropriés (ILIKE, AND, OR)
+4. LIMIT présent
+
+Si erreur, corrige la requête.
+
+FORMAT RÉPONSE :
 {
-  "filter": {
-    "and": [
-      ...
-    ]
-  },
-  "page_size": 10
+  "valid": true/false,
+  "corrected_query": "<sql si correction>",
+  "error_message": "<message si erreur>"
 }
-
-RETOURNE UNIQUEMENT UN JSON VALIDE.
 """

@@ -24,10 +24,11 @@ class APIConfig:
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
     
-    # Notion
-    NOTION_API_KEY: str = os.getenv("NOTION_API_KEY", "")
-    NOTION_DATABASE_ID: str = os.getenv("NOTION_DATABASE_ID", "")
-    NOTION_API_VERSION: str = "2022-06-28"
+    # DuckDB / Data
+    DUCKDB_CSV_PATH: str = os.getenv(
+        "DUCKDB_CSV_PATH",
+        "./data/deal_radar - Database.csv"
+    )
     
     # Serper (Web Search)
     SERPER_API_KEY: str = os.getenv("SERPER_API_KEY", "")
@@ -44,8 +45,6 @@ class APIConfig:
         """Validate that all required API keys are present"""
         required = [
             ("OPENAI_API_KEY", cls.OPENAI_API_KEY),
-            ("NOTION_API_KEY", cls.NOTION_API_KEY),
-            ("NOTION_DATABASE_ID", cls.NOTION_DATABASE_ID),
             ("SERPER_API_KEY", cls.SERPER_API_KEY),
         ]
         
@@ -54,6 +53,13 @@ class APIConfig:
         if missing:
             raise ValueError(
                 f"Missing required API keys/config: {', '.join(missing)}"
+            )
+        
+        # Validate CSV path exists
+        csv_path = Path(cls.DUCKDB_CSV_PATH)
+        if not csv_path.exists():
+            raise FileNotFoundError(
+                f"CSV file not found: {cls.DUCKDB_CSV_PATH}"
             )
         
         return True

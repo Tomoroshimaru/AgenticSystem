@@ -11,8 +11,8 @@ langchain-core>=0.3.0
 # Data validation
 pydantic>=2.0.0
 
-# Notion API
-notion-client>=2.2.0
+# Database (DuckDB for CSV queries)
+duckdb>=1.0.0
 
 # Google Drive API
 google-api-python-client>=2.0.0
