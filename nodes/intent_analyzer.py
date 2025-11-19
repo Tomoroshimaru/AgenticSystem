@@ -28,7 +28,6 @@ def intent_analyzer_node(state: InvestmentState) -> Dict[str, Any]:
     logger.info("=" * 50)
     logger.info("NODE 1: Intent Analyzer")
     logger.info("=" * 50)
-    
     try:
         user_query = state.user_query
         
@@ -90,7 +89,7 @@ def intent_analyzer_node(state: InvestmentState) -> Dict[str, Any]:
                         "node": "intent_analyzer",
                         "error_type": "JSONDecodeError",
                         "message": f"Failed to parse LLM response as JSON: {str(e)}",
-                        "retry_possible": True
+                        "retry_possible": False
                     }
                 ]
             }
