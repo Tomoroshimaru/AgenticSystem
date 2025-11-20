@@ -61,13 +61,11 @@ class AnalyzedIntent(BaseModel):
     )
     criteria: Dict[str, Any] = Field(
         default_factory=dict,
-        description="Critères de filtrage extraits"
+        description="Critères de filtrage extraits (sector, round, country, tags, amount_min, amount_max, investors, spotted_date_after, spotted_date_before, founding_year, founding_year_min, founding_year_max)"
     )
-    max_results: int = Field(
-        default=10,
-        le=20,
-        ge=1,
-        description="Nombre maximum de résultats"
+    max_results: Optional[int] = Field(
+        default=None,
+        description="Nombre maximum de résultats (None = pas de limite, retourner tous les résultats)"
     )
     raw_query: str = Field(default="", description="Requête originale")
     
@@ -80,10 +78,13 @@ class AnalyzedIntent(BaseModel):
                     "round": "Serie A",
                     "country": "France",
                     "tags": ["Enterprise", "B2B"],
-                    "keywords": ["cloud", "security"]
+                    "keywords": ["cloud", "security"],
+                    "investors": "Sequoia",
+                    "spotted_date_after": "2025-01-01",
+                    "founding_year_min": "2020"
                 },
-                "max_results": 10,
-                "raw_query": "Trouve moi des levées SaaS en Serie A en France"
+                "max_results": None,
+                "raw_query": "Trouve moi toutes les levées SaaS en Serie A en France par Sequoia cette année pour des startups créées après 2020"
             }
         }
 

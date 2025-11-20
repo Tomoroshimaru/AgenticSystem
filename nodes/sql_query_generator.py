@@ -41,6 +41,7 @@ def sql_query_generator_node(state: InvestmentState) -> Dict[str, Any]:
             }
         
         logger.info(f"Generating SQL query for criteria: {analyzed_intent.criteria}")
+        logger.info(f"Max results: {analyzed_intent.max_results if analyzed_intent.max_results else 'UNLIMITED'}")
         
         # Initialize LLM
         llm = ChatOpenAI(
@@ -76,13 +77,39 @@ IMPORTANT RULES:
 4. Handle NULL values appropriately
 5. Use LIKE for partial text matching (case-insensitive: ILIKE)
 6. Combine multiple conditions with AND/OR
-7. Always add LIMIT 20 to avoid returning too many results
+7. CRITICAL: Only add LIMIT clause if max_results is specified and not null
+   - If max_results is null or not present: NO LIMIT clause (return all matching results)
+   - If max_results has a value: add LIMIT clause with that value
 
-Examples:
+FIELD MAPPING:
 - Sector filter: WHERE "Sector 1" = 'Fintech' OR "Sector 2" = 'Fintech'
 - Round filter: WHERE "Round" ILIKE '%Series A%'
 - Country filter: WHERE "Country" = 'United States'
 - Amount filter: WHERE CAST(REPLACE("Amount_Raised", ' M$', '') AS FLOAT) > 10.0
+- Investors filter: WHERE "Investors" ILIKE '%Sequoia%'
+- Spotted Date After: WHERE "Spotted_Date" >= '2025-01-01'
+- Spotted Date Before: WHERE "Spotted_Date" <= '2025-12-31'
+- Founding Year: WHERE "Founding_Year" = '2020'
+- Founding Year Min: WHERE CAST("Founding_Year" AS INTEGER) >= 2020
+- Founding Year Max: WHERE CAST("Founding_Year" AS INTEGER) <= 2022
+
+EXAMPLES:
+
+Example 1 (NO LIMIT - return all results):
+Intent: {{"criteria": {{"sector": "AI"}}, "max_results": null}}
+SQL: SELECT * FROM deals WHERE "Sector 1" ILIKE '%AI%'
+
+Example 2 (WITH LIMIT):
+Intent: {{"criteria": {{"sector": "Fintech"}}, "max_results": 10}}
+SQL: SELECT * FROM deals WHERE "Sector 1" ILIKE '%Fintech%' LIMIT 10
+
+Example 3 (Date + Investor filters, NO LIMIT):
+Intent: {{"criteria": {{"investors": "Sequoia", "spotted_date_after": "2025-01-01"}}, "max_results": null}}
+SQL: SELECT * FROM deals WHERE "Investors" ILIKE '%Sequoia%' AND "Spotted_Date" >= '2025-01-01'
+
+Example 4 (Founding year filter, NO LIMIT):
+Intent: {{"criteria": {{"founding_year_min": "2020", "tags": ["AI"]}}, "max_results": null}}
+SQL: SELECT * FROM deals WHERE CAST("Founding_Year" AS INTEGER) >= 2020 AND ("Tag 1" ILIKE '%AI%' OR "Tag 2" ILIKE '%AI%' OR "Tag 3" ILIKE '%AI%')
 
 Your SQL query (output ONLY the SQL, no explanations):
 """
@@ -113,6 +140,18 @@ Your SQL query (output ONLY the SQL, no explanations):
                 
                 if is_valid:
                     logger.info("✅ SQL query validated successfully")
+                    
+                    # Check if LIMIT is appropriate
+                    has_limit = "LIMIT" in sql_query.upper()
+                    should_have_limit = analyzed_intent.max_results is not None
+                    
+                    if has_limit and not should_have_limit:
+                        logger.warning("⚠️ Query has LIMIT but max_results is None - removing LIMIT")
+                        sql_query = sql_query.split("LIMIT")[0].strip()
+                    elif not has_limit and should_have_limit:
+                        logger.info(f"✅ Adding LIMIT {analyzed_intent.max_results}")
+                        sql_query = f"{sql_query} LIMIT {analyzed_intent.max_results}"
+                    
                     return {
                         "generated_query": sql_query,
                         "query_valid": True,
