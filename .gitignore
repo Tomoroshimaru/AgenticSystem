@@ -39,7 +39,8 @@ env/
 .env.*.local
 
 # Database 
-data/
+data/*.csv
+*.csv
 
 # IDE
 .vscode/

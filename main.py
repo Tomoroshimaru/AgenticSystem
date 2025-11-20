@@ -11,6 +11,10 @@ from loguru import logger
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command
+from langfuse.langchain import CallbackHandler
+from config import APIConfig
+
+langfuse_handler = CallbackHandler()
 
 from state import InvestmentState
 from config import WorkflowConfig, LogConfig, validate_config
@@ -176,7 +180,8 @@ def run_workflow(user_query: str, thread_id: str = "default"):
         messages=[{"role": "user", "content": user_query}]
     )
     
-    config = {"configurable": {"thread_id": thread_id}}
+    config = {"configurable" : {"thread_id": thread_id,
+              "callbacks": [langfuse_handler]}}
     
     try:
         # Run until interrupt

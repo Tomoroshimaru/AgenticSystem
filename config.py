@@ -35,7 +35,12 @@ class APIConfig:
         "./oauth_credentials.json"
     )
     GOOGLE_DRIVE_FOLDER_ID: Optional[str] = os.getenv("GOOGLE_DRIVE_FOLDER_ID")
-    
+
+    # Langfuse credentials
+    LANGFUSE_PUBLIC_KEY: str = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    LANGFUSE_SECRET_KEY: str = os.getenv("LANGFUSE_SECRET_KEY", "")
+    LANGFUSE_HOST: str = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+
     @classmethod
     def validate(cls) -> bool:
         """Validate required config"""
