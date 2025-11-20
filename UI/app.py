@@ -355,8 +355,8 @@ def render_deal_card(deal: Dict[str, Any], index: int):
                 info_parts.append(f"💵 {deal['amount_raised']}")
             
             if info_parts:
-                st.markdown(" • ".join(info_parts))
-            
+                st.markdown("   ".join(info_parts))
+
             # Pitch
             pitch = deal.get('pitch', '')
             if pitch:
@@ -365,9 +365,15 @@ def render_deal_card(deal: Dict[str, Any], index: int):
             # Tags as badges
             tags = [t for t in deal.get('tags', []) if t]
             if tags:
-                st.markdown("**Tags:**")
                 tag_badges = [(tag, 'tech') for tag in tags]
                 st.markdown(render_badges_html(tag_badges), unsafe_allow_html=True)
+            
+            st.markdown("<br>", unsafe_allow_html=True)
+
+            # Investors
+            investors = deal.get('investors', ' - ')
+            if investors:
+                st.markdown(f"**Investors:** {investors}")
             
             # Links
             link_cols = st.columns([1, 1])
