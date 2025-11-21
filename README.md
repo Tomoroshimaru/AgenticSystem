@@ -19,6 +19,8 @@ Investment Agent transforme vos requêtes en langage naturel en rapports d'analy
 
 ## 🏗️ Architecture
 
+<img src="./.media/Mermaid Workflow Chart.png" alt="Présentation de Ugo" width="70%" style="height: 750px; object-fit: cover;">
+
 Le système utilise **LangGraph** pour orchestrer 7 agents spécialisés :
 
 ```
@@ -40,6 +42,8 @@ Requête utilisateur
 ```
 
 ### Architecture technique
+
+<img src="./.media/FullArchitecture.png" alt="Présentation de Ugo" width="100%" style="height: 750px; object-fit: cover;">
 
 - **State Management** : Classe `InvestmentState` (Pydantic) comme mémoire partagée
 - **Orchestration** : LangGraph pour le workflow multi-agents
